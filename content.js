@@ -1,13 +1,16 @@
 // Indicates whether tracking is currently active
 let isTracking = false;
 // Stores tracked data for the current session
-let trackedData = '';
+let trackedData = [];
+let hoverTimeout = null; // Timer for hover detection
+let currentElement = null; // Currently hovered element
+
 
 // Function to start tracking
 const startTracking = () => {
     if (!isTracking) {
         isTracking = true;
-        trackedData = '';
+        trackedData = [];
 
         // Add event listener to track mouse movements
         document.addEventListener('mousemove', trackMouse);
@@ -27,34 +30,57 @@ const stopTracking = () => {
     }
 };
 
+
 // Function to handle mouse movements and track data
 const trackMouse = (event) => {
-    const x = event.clientX;
-    const y = event.clientY;
-    // Get the topmost DOM element at the mouse pointer's coordinates
-    const element = document.elementFromPoint(x, y);
+    const element = document.elementFromPoint(event.clientX, event.clientY);
     
-    // Check if the element is valid before accessing its properties
+    if (element !== currentElement) {
+        // If the mouse moves to a new element, clear the previous timer
+        clearTimeout(hoverTimeout);
+        currentElement = element;
+        
+        // Start a new timer for the new element
+        hoverTimeout = setTimeout(() => {
+            recordElement(element, event);
+        }, 1000); // 1 second
+    }
+};
+
+
+// Function to record the element after the mouse has been over it for 1 second
+const recordElement = (element, event) => {
     if (element !== null && element !== undefined) {
-        // Apply a bright blue border to the element being tracked
-        element.style.border = '2px solid #00f'; // Bright blue color
+        // Get the mouse position relative to the entire webpage
+        const pageX = event.clientX + window.scrollX;
+        const pageY = event.clientY + window.scrollY;
+
         
         // Create an object to store element details
-        const elementData = {
-            id: element.id || '',
-            class: element.className || '',
-            data: element.outerHTML
-        };
-        // Append the element data to the tracked data string
-        trackedData += JSON.stringify(elementData) + '\n';
+        const elementData = [
+            window.location.href, // URL
+            element.outerHTML, // Element
+            element.className || '', // Element Class
+            element.id || '', // Element ID
+            pageX, // Position X relative to page window
+            pageY // Position Y relative to page window
+        ];
+        trackedData.push(elementData);
+        
+        // Debuger log
         console.log(elementData);
+        
 
+        // Apply a bright blue border to the element being tracked
+        element.style.border = '2px solid #00f';
+    
         // Remove the border when the mouse leaves the element
         element.addEventListener('mouseleave', () => {
             element.style.border = 'none';
         });
     }
 };
+
 
 // Initialize the content script by retrieving the tracking state from the background script
 chrome.runtime.sendMessage({ command: 'getTrackingState' }, (response) => {

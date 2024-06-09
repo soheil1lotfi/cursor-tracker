@@ -1,8 +1,8 @@
-// Get references to the start and stop buttons
 const startButton = document.getElementById('startButton');
 const stopButton = document.getElementById('stopButton');
-// Get reference to the textarea where tracked data will be displayed
 const trackedDataTextarea = document.getElementById('trackedData');
+const exportButton = document.getElementById('exportButton');
+
 
 // Function to update the visibility of the start and stop buttons based on the tracking state
 const updateButtonStates = (trackingStarted) => {
@@ -40,8 +40,51 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
+// // Add click event listener to export button
+// exportButton.addEventListener('click', () => {
+//     chrome.runtime.sendMessage({ command: 'getTrackedData' }, (response) => {
+//         console.log(response)
+//         let csvContent = "data:text/csv;charset=utf-8,URL,Element ID,Element Class,Element Data,Page X,Page Y\n";
+//         for (const [url, dataArray] of Object.entries(response)) {
+//             dataArray.forEach(data => {
+//                 const row = `${url},${data.id || ''},${data.class || ''},"${(data.data || '').replace(/(\r\n|\n|\r)/gm, "").replace(/"/g, '""')}",${data.pageX || ''},${data.pageY || ''}\n`;
+//                 csvContent += row;
+//             });
+//         }
+//         const encodedUri = encodeURI(csvContent);
+//         const link = document.createElement("a");
+//         link.setAttribute("href", encodedUri);
+//         link.setAttribute("download", "tracked_data.csv");
+//         document.body.appendChild(link);
+//         link.click();
+//         document.body.removeChild(link);
+//     });
+// });
+
+// Add click event listener to export button
+exportButton.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ command: 'getTrackedData' }, (response) => {
+        let csvContent = "data:text/csv;charset=utf-8,URL,Element,Element Class,Element ID,Page X,Page Y\n";
+        response.forEach(data => {
+            const row = `${data[0]},"${data[1].replace(/"/g, '""')}","${data[2]}",${data[3]},${data[4]},${data[5]}\n`;
+            csvContent += row;
+        });
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "tracked_data.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+});
+
+
 // Initialize button states based on the current tracking state
 chrome.runtime.sendMessage({ command: 'getTrackingState' }, (response) => {
     // Update the button states according to the current tracking state
     updateButtonStates(response.isTracking);
+    chrome.runtime.sendMessage({ command: 'getTrackedData' }, (trackedData) => {
+        trackedDataTextarea.value = JSON.stringify(trackedData, null, 2); // Pretty print JSON
+    });
 });
