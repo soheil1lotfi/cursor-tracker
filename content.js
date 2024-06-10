@@ -52,9 +52,14 @@ const trackMouse = (event) => {
 const recordElement = (element, event) => {
     if (element !== null && element !== undefined) {
         // Get the mouse position relative to the entire webpage
-        const pageX = event.clientX + window.scrollX;
-        const pageY = event.clientY + window.scrollY;
-
+        const clientX = event.clientX;
+        const clientY = event.clientY;
+        const pageX = event.pageX;
+        const pageY = event.pageY;
+        const screenX = event.screenX + window.scrollX;
+        const screenY = event.screenY + window.scrollY;
+        const scrollX = window.scrollX;
+        const scrollY = window.scrollY;
         
         // Create an object to store element details
         const elementData = [
@@ -63,7 +68,13 @@ const recordElement = (element, event) => {
             element.className || '', // Element Class
             element.id || '', // Element ID
             pageX, // Position X relative to page window
-            pageY // Position Y relative to page window
+            pageY, // Position Y relative to page window
+            screenX, 
+            screenY,
+            clientX, 
+            clientY, 
+            scrollX, 
+            scrollY
         ];
         trackedData.push(elementData);
         
