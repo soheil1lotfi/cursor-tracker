@@ -40,26 +40,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
-// // Add click event listener to export button
-// exportButton.addEventListener('click', () => {
-//     chrome.runtime.sendMessage({ command: 'getTrackedData' }, (response) => {
-//         console.log(response)
-//         let csvContent = "data:text/csv;charset=utf-8,URL,Element ID,Element Class,Element Data,Page X,Page Y\n";
-//         for (const [url, dataArray] of Object.entries(response)) {
-//             dataArray.forEach(data => {
-//                 const row = `${url},${data.id || ''},${data.class || ''},"${(data.data || '').replace(/(\r\n|\n|\r)/gm, "").replace(/"/g, '""')}",${data.pageX || ''},${data.pageY || ''}\n`;
-//                 csvContent += row;
-//             });
-//         }
-//         const encodedUri = encodeURI(csvContent);
-//         const link = document.createElement("a");
-//         link.setAttribute("href", encodedUri);
-//         link.setAttribute("download", "tracked_data.csv");
-//         document.body.appendChild(link);
-//         link.click();
-//         document.body.removeChild(link);
-//     });
-// });
 
 // Add click event listener to export button
 exportButton.addEventListener('click', () => {
