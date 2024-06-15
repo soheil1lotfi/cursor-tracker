@@ -63,7 +63,8 @@ const recordElement = (element, event) => {
             element.className || '', // Element Class
             element.id || '', // Element ID
             pageX, // Position X relative to page window
-            pageY // Position Y relative to page window
+            pageY, // Position Y relative to page window
+            new Date().toISOString() // Timestamp
         ];
         trackedData.push(elementData);
         
