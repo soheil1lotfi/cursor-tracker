@@ -31,25 +31,54 @@ const stopTracking = () => {
 };
 
 
+// // Function to handle mouse movements and track data //Old function with no click event recording
+// const trackMouse = (event) => {
+//     const element = document.elementFromPoint(event.clientX, event.clientY);
+    
+//     if (element !== currentElement) {
+//         // If the mouse moves to a new element, clear the previous timer
+//         clearTimeout(hoverTimeout);
+//         currentElement = element;
+        
+//         // Start a new timer for the new element
+//         hoverTimeout = setTimeout(() => {
+//             recordElement(element, event);
+//         }, 1000); // 1 second
+//     }
+// };
+
+
 // Function to handle mouse movements and track data
 const trackMouse = (event) => {
     const element = document.elementFromPoint(event.clientX, event.clientY);
-    
+
     if (element !== currentElement) {
-        // If the mouse moves to a new element, clear the previous timer
+        // If the mouse moves to a new element, clear the previous timer and remove click listener
         clearTimeout(hoverTimeout);
+        if (currentElement) {
+            currentElement.removeEventListener('click', handleElementClick, true);
+        }
+
         currentElement = element;
-        
+
         // Start a new timer for the new element
         hoverTimeout = setTimeout(() => {
-            recordElement(element, event);
+            recordElement(element, event, false);
+            // Add a click listener to the current element
+            element.addEventListener('click', handleElementClick, true);
         }, 1000); // 1 second
     }
 };
 
+// Function to handle click events and track data
+const handleElementClick = (event) => {
+    const element = event.target;
+    recordElement(element, event, true);
+};
+
 
 // Function to record the element after the mouse has been over it for 1 second
-const recordElement = (element, event) => {
+const recordElement = (element, event, clicked) => {
     if (element !== null && element !== undefined) {
         // Get the mouse position relative to the entire webpage
         const pageX = event.clientX + window.scrollX;
@@ -64,7 +93,8 @@ const recordElement = (element, event) => {
             element.id || '', // Element ID
             pageX, // Position X relative to page window
             pageY, // Position Y relative to page window
-            new Date().toISOString() // Timestamp
+            new Date().toISOString(), // Timestamp
+            clicked
         ];
         trackedData.push(elementData);
         
