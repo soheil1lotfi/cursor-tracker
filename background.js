@@ -21,10 +21,9 @@ const createIcon = (color) => {
     return context.getImageData(0, 0, 16, 16);
 };
 
-// Fail try to load it from a file
+// Failed try to load the icon from a file
 // const updateIcon = () => {
 //     const iconPath = trackingState.isTracking ? "icon_green.png" : "icon_red.png";
-
 //     chrome.action.setIcon({  path: { 16: 'iconPath' } }, () => {
 //         if (chrome.runtime.lastError) {
 //             console.error(chrome.runtime.lastError.message);
