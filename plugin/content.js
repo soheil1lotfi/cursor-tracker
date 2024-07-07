@@ -4,6 +4,7 @@ let isTracking = false;
 let trackedData = [];
 let hoverTimeout = null; // Timer for hover detection
 let currentElement = null; // Currently hovered element
+let gazeCoords = { x: 0, y: 0 };
 
 
 // Function to start tracking
@@ -79,20 +80,23 @@ const handleElementClick = (event) => {
 
 // Function to record the element after the mouse has been over it for 1 second
 const recordElement = (element, event, clicked) => {
+    
     if (element !== null && element !== undefined) {
         // Get the mouse position relative to the entire webpage
         const pageX = event.clientX + window.scrollX;
         const pageY = event.clientY + window.scrollY;
-
         
+        console.log(pageX)
         // Create an object to store element details
         const elementData = [
             window.location.href, // URL
             element.outerHTML, // Element
-            element.className || '', // Element Class
-            element.id || '', // Element ID
-            pageX, // Position X relative to page window
-            pageY, // Position Y relative to page window
+            element.className || null, // Element Class
+            element.id || null, // Element ID
+            pageX || null, // Position X relative to page window
+            pageY || null,// Position Y relative to page window
+            gazeCoords.x || null,
+            gazeCoords.y || null,
             new Date().toISOString(), // Timestamp
             clicked
         ];
@@ -124,7 +128,12 @@ chrome.runtime.sendMessage({ command: 'getTrackingState' }, (response) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.command === 'startTracking') {
         startTracking();
-    } else if (message.command === 'stopTracking') {
+    } 
+    else if (message.command === 'stopTracking') {
         stopTracking();
+    }
+    else if (message.command === 'updateGazeCoords') {
+        gazeCoords.x = message.gazeX;
+        gazeCoords.y = message.gazeY;
     }
 });

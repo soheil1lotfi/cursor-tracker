@@ -44,7 +44,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Add click event listener to export button
 exportButton.addEventListener('click', () => {
     chrome.runtime.sendMessage({ command: 'getTrackedData' }, (response) => {
-        let csvContent = "data:text/csv;charset=utf-8,URL,Element,Element Class,Element ID,Page X,Page Y\n";
+        let csvContent = "data:text/csv;charset=utf-8,URL,Element,Element Class,Element ID,Page X,Page Y,Time Stamp, Clicked\n";
         response.forEach(data => {
             const row = `${data[0]},"${data[1].replace(/"/g, '""')}","${data[2]}",${data[3]},${data[4]},${data[5]},${data[6]},${data[7]}\n`;
             csvContent += row;

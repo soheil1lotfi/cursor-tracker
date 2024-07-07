@@ -1,3 +1,4 @@
+
 // Object to store the tracking state, tracked data, and the current page URL
 let trackingState = {
     isTracking: false, // Boolean to indicate if tracking is active
@@ -60,7 +61,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chrome.runtime.sendMessage({ command: trackingState.isTracking ? 'trackingStarted' : 'trackingStopped' });
     } else if (message.command === 'getTrackedData') {
         sendResponse(trackingState.trackedData);
-    }
+    } 
+    // else if (message.command === 'getGazeCoords') {
+    //     sendResponse([gazeX, gazeY]);
+    // }
 });
 
 
@@ -80,7 +84,57 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
     });
 });
 
+function connectWebSocket() {
+    const ws = new WebSocket('ws://localhost:8765');
 
+    let gazeX = 0
+    let gazeY = 0
+
+    ws.onopen = () => {
+        console.log('WebSocket connection established');
+    };
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        gazeX = data.gazeX * 1000;
+        gazeY = data.gazeY * 1000;
+        
+        // Send gaze coordinates to all active content scripts
+        chrome.tabs.query({}, (tabs) => {
+            for (let tab of tabs) {
+                chrome.tabs.sendMessage(tab.id, { command: 'updateGazeCoords', gazeX, gazeY });
+            }
+        });
+        console.log('Gaze Coordinates:', gazeX, gazeY);
+
+    //   // Optionally, send message to the content script of the active tab
+    //   chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+    //     if (tabs.length > 0) {
+    //       chrome.tabs.sendMessage(tabs[0].id, {gazeX: gazeX, gazeY: gazeY}, (response) => {
+    //         if (chrome.runtime.lastError) {
+    //           console.error("Error sending message:", chrome.runtime.lastError);
+    //         } else {
+    //           console.log("Message sent to content script:", response);
+    //         }
+    //       });
+    //     } else {
+    //       console.log("No active tabs found");
+    //     }
+    //   });
+    };
+
+    ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+        console.log('WebSocket connection closed, retrying in 1 second');
+      setTimeout(connectWebSocket, 1000); // Retry connection after 1 second
+    };
+}
+
+  // Start the WebSocket connection
+    connectWebSocket();
 
 
 updateIcon();
