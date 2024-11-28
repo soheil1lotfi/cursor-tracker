@@ -457,6 +457,14 @@ class TagWindow(QWidget):
             painter.fillRect(
                 cornerRect, QColor(0, 0, 0, 255 - self.tagBrightnessInput.value())
             )
+        # Draw the surface boundary (optional debug visualization)
+        painter.setPen(QColor(0, 255, 0))  # Green for surface boundary
+        _, surface_verts = self.getMarkerVerts()
+
+        for i in range(len(surface_verts)):
+            start = QPoint(*surface_verts[i])
+            end = QPoint(*surface_verts[(i + 1) % len(surface_verts)])  # Wrap to first point
+            painter.drawLine(start, end)
 
     def resizeEvent(self, event):
         self.surfaceChanged.emit()
@@ -474,23 +482,70 @@ class TagWindow(QWidget):
     def getTagPadding(self):
         return self.getMarkerSize() / 8
 
+    # def getMarkerVerts(self):
+    #     tagPadding = self.getTagPadding()
+    #     markers_verts = {}
+
+    #     for cornerIdx, markerID in enumerate(self.markerIDs):
+    #         rect = self.getCornerRect(cornerIdx) - QMargins(
+    #             tagPadding, tagPadding, tagPadding, tagPadding
+    #         )
+
+    #         markers_verts[markerID] = [
+    #             pointToTuple(rect.topLeft()),
+    #             pointToTuple(rect.topRight()),
+    #             pointToTuple(rect.bottomRight()),
+    #             pointToTuple(rect.bottomLeft()),
+    #         ]
+
+    #     return markers_verts
+
     def getMarkerVerts(self):
         tagPadding = self.getTagPadding()
-        markers_verts = {}
 
-        for cornerIdx, markerID in enumerate(self.markerIDs):
-            rect = self.getCornerRect(cornerIdx) - QMargins(
-                tagPadding, tagPadding, tagPadding, tagPadding
-            )
+        # Get rectangles for each marker
+        top_left_marker = self.getCornerRect(0) - QMargins(tagPadding, tagPadding, tagPadding, tagPadding)
+        top_right_marker = self.getCornerRect(1) - QMargins(tagPadding, tagPadding, tagPadding, tagPadding)
+        bottom_right_marker = self.getCornerRect(2) - QMargins(tagPadding, tagPadding, tagPadding, tagPadding)
+        bottom_left_marker = self.getCornerRect(3) - QMargins(tagPadding, tagPadding, tagPadding, tagPadding)
 
-            markers_verts[markerID] = [
-                pointToTuple(rect.topLeft()),
-                pointToTuple(rect.topRight()),
-                pointToTuple(rect.bottomRight()),
-                pointToTuple(rect.bottomLeft()),
-            ]
+        # Identify the corners
+        surface_verts = [
+            pointToTuple(top_left_marker.bottomRight()),  # Bottom-right of top-left marker
+            pointToTuple(top_right_marker.bottomLeft()),  # Bottom-left of top-right marker
+            pointToTuple(bottom_right_marker.topLeft()),  # Top-left of bottom-right marker
+            pointToTuple(bottom_left_marker.topRight()),  # Top-right of bottom-left marker
+        ]
 
-        return markers_verts
+        # Return the marker vertices and surface vertices separately if needed
+        markers_verts = {
+            0: [
+                pointToTuple(top_left_marker.topLeft()),
+                pointToTuple(top_left_marker.topRight()),
+                pointToTuple(top_left_marker.bottomRight()),
+                pointToTuple(top_left_marker.bottomLeft()),
+            ],
+            1: [
+                pointToTuple(top_right_marker.topLeft()),
+                pointToTuple(top_right_marker.topRight()),
+                pointToTuple(top_right_marker.bottomRight()),
+                pointToTuple(top_right_marker.bottomLeft()),
+            ],
+            2: [
+                pointToTuple(bottom_right_marker.topLeft()),
+                pointToTuple(bottom_right_marker.topRight()),
+                pointToTuple(bottom_right_marker.bottomRight()),
+                pointToTuple(bottom_right_marker.bottomLeft()),
+            ],
+            3: [
+                pointToTuple(bottom_left_marker.topLeft()),
+                pointToTuple(bottom_left_marker.topRight()),
+                pointToTuple(bottom_left_marker.bottomRight()),
+                pointToTuple(bottom_left_marker.bottomLeft()),
+            ],
+        }
+
+        return markers_verts, surface_verts
 
     def getSurfaceSize(self):
         return (self.width(), self.height())
