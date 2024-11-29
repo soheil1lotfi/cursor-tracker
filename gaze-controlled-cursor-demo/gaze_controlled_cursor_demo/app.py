@@ -16,6 +16,9 @@ import pyautogui
 from .ui import TagWindow
 from .dwell_detector import DwellDetector
 
+
+import struct
+
 pyautogui.FAILSAFE = False
 
 
@@ -173,7 +176,7 @@ class PupilPointerApp(QApplication):
     #     loop.run_until_complete(start_server)
     #     loop.run_forever()
 
-#new one to try
+    #new one to try
     def run_websocket_server(self):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -187,18 +190,42 @@ class PupilPointerApp(QApplication):
         loop.run_until_complete(server())
 
 
+
+    # Normal sending function
+    # async def send_gaze_coordinates(self, gaze_x, gaze_y):
+    #     message = json.dumps({"gazeX": gaze_x, "gazeY": gaze_y})
+    #     print(gaze_x, gaze_y)
+    #     if self.websocket_clients:
+    #         await asyncio.wait(
+    #             [
+    #                 asyncio.create_task(client.send(message))
+    #                 for client in self.websocket_clients
+    #             ]
+    #         )
+    #     else:
+    #         print("No WebSocket clients connected")
+
+
+
+    # Binary sending function
     async def send_gaze_coordinates(self, gaze_x, gaze_y):
-        message = json.dumps({"gazeX": gaze_x, "gazeY": gaze_y})
-        print(gaze_x*1000, gaze_y*1000)
+        # Scale gaze coordinates to screen resolution (multiplied by 1000)
+        scaled_gaze_x = max(-32000, min(32000, int(gaze_x * 1000)))  # Limit to int16 range
+        scaled_gaze_y = max(-32000, min(32000, int(gaze_y * 1000)))
+
+        # Pack the integers into a binary format (two int16 values)
+        binary_message = struct.pack('hh', scaled_gaze_x, scaled_gaze_y)
+
         if self.websocket_clients:
             await asyncio.wait(
                 [
-                    asyncio.create_task(client.send(message))
+                    asyncio.create_task(client.send(binary_message))
                     for client in self.websocket_clients
                 ]
             )
         else:
             print("No WebSocket clients connected")
+
 
     def exec(self):
         self.tagWindow.setStatus("Looking for a device...")
