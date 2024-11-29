@@ -7,6 +7,49 @@ let currentElement = null; // Currently hovered element
 let gazeCoords = { x: 0, y: 0 };
 
 
+function injectSvgToCorner(filePath, position) {
+    // Get the full URL of the SVG file
+    const imgURL = chrome.runtime.getURL(filePath);
+    console.log(`Loading SVG from: ${imgURL}`);
+
+    // Create an img element
+    const img = document.createElement("img");
+    img.src = imgURL; // Set the image source to the SVG URL
+    img.width = 200; // Adjust width as needed
+    img.height = 200; // Adjust height as needed
+
+    // Set necessary styles
+    img.style.position = "fixed";
+    img.style.zIndex = "9999";
+    img.style.pointerEvents = "none";
+
+    // Set position based on which corner is specified
+    if (position === "top-left") {
+        img.style.top = "0";
+        img.style.left = "0";
+    } else if (position === "top-right") {
+        img.style.top = "0";
+        img.style.right = "0";
+    } else if (position === "bottom-left") {
+        img.style.bottom = "0";
+        img.style.left = "0";
+    } else if (position === "bottom-right") {
+        img.style.bottom = "0";
+        img.style.right = "0";
+    }
+
+    // Append the img to the body
+    document.body.appendChild(img);
+
+    // // Log to confirm that the element was appended successfully
+    // console.log(`Injected SVG in ${position}`, img);
+}
+injectSvgToCorner("apriltags/tag36h11-0.svg", "top-left");
+injectSvgToCorner("apriltags/tag36h11-1.svg", "top-right");
+injectSvgToCorner("apriltags/tag36h11-2.svg", "bottom-right");
+injectSvgToCorner("apriltags/tag36h11-3.svg", "bottom-left");
+
+
 // Function to start tracking
 const startTracking = () => {
     if (!isTracking) {
@@ -135,5 +178,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     else if (message.command === 'updateGazeCoords') {
         gazeCoords.x = message.gazeX;
         gazeCoords.y = message.gazeY;
+        console.log('Gaze Coordinates:', message.gazeX, message.gazeY);
+        sendResponse({ status: "success" }); // Optionally respond
     }
 });
+

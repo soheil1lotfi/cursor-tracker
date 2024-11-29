@@ -1,9 +1,10 @@
-
 // Object to store the tracking state, tracked data, and the current page URL
 let trackingState = {
     isTracking: false, // Boolean to indicate if tracking is active
     trackedData: [], // Object to store tracked data for each URL
-    currentPageUrl: '' // String to store the current page URL
+    currentPageUrl: '', // String to store the current page URL
+    currentPageId: '' // String to store the current page URL
+
 };
 
 // Function to toggle the tracking state
@@ -81,12 +82,13 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.tabs.onActivated.addListener((activeInfo) => {
     chrome.tabs.get(activeInfo.tabId, (tab) => {
         trackingState.currentPageUrl = tab.url;
+        trackingState.currentPageId = tab.id;
     });
 });
 
 function connectWebSocket() {
     const ws = new WebSocket('ws://localhost:8765');
-
+    ws.binaryType = 'arraybuffer';
     let gazeX = 0
     let gazeY = 0
 
@@ -94,34 +96,66 @@ function connectWebSocket() {
         console.log('WebSocket connection established');
     };
 
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        gazeX = data.gazeX * 1000;
-        gazeY = data.gazeY * 1000;
+    // Normal receiver
+    // ws.onmessage = (event) => {
+    //     const data = JSON.parse(event.data);
+    //     gazeX = data.gazeX * 1000;
+    //     gazeY = data.gazeY * 1000;
         
-        // Send gaze coordinates to all active content scripts
-        chrome.tabs.query({}, (tabs) => {
-            for (let tab of tabs) {
-                chrome.tabs.sendMessage(tab.id, { command: 'updateGazeCoords', gazeX, gazeY });
-            }
-        });
-        console.log('Gaze Coordinates:', gazeX, gazeY);
+    //     // // Send gaze coordinates to all active content scripts
+    //     // chrome.tabs.query({}, (tabs) => {
+    //     //     for (let tab of tabs) {
+    //     //         chrome.tabs.sendMessage(tab.id, { command: 'updateGazeCoords', gazeX, gazeY });
+    //     //     }
+    //     // });
+    //     // console.log('Gaze Coordinates:', gazeX, gazeY);
 
     //   // Optionally, send message to the content script of the active tab
-    //   chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-    //     if (tabs.length > 0) {
-    //       chrome.tabs.sendMessage(tabs[0].id, {gazeX: gazeX, gazeY: gazeY}, (response) => {
-    //         if (chrome.runtime.lastError) {
-    //           console.error("Error sending message:", chrome.runtime.lastError);
+    //     chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+
+    //     let activeTab = trackingState.currentPageId
+    //     if (tabs.length) {
+    //         chrome.tabs.sendMessage(activeTab, { command: 'updateGazeCoords', gazeX, gazeY }, (response) => {
+    //             if (chrome.runtime.lastError) {
+    //                 console.error("Error sending message:", chrome.runtime.lastError);
     //         } else {
-    //           console.log("Message sent to content script:", response);
+    //             console.log("Message sent to content script:", response);
     //         }
-    //       });
+    //     });
+    //     console.log('Gaze Coordinates:', gazeX, gazeY);
     //     } else {
-    //       console.log("No active tabs found");
+    //         console.log("No active tabs found");
     //     }
-    //   });
+    // });
+    
+    // };
+
+
+    // Binray receiver
+    ws.onmessage = (event) => {
+        const buffer = new DataView(event.data);
+        const gazeX = buffer.getInt16(0, true); // Pre-multiplied to screen coordinates
+        const gazeY = buffer.getInt16(2, true);
+    
+        console.log(`Screen Coordinates: X=${gazeX}, Y=${gazeY}`);
+      // Optionally, send message to the content script of the active tab
+        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+
+        let activeTab = trackingState.currentPageId
+        if (tabs.length) {
+            chrome.tabs.sendMessage(activeTab, { command: 'updateGazeCoords', gazeX, gazeY }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.error("Error sending message:", chrome.runtime.lastError);
+            } else {
+                console.log("Message sent to content script:", response);
+            }
+        });
+        } else {
+            console.log("No active tabs found");
+        }
+    });
     };
+    
 
     ws.onerror = (error) => {
         console.error('WebSocket error:', error);
@@ -138,4 +172,5 @@ function connectWebSocket() {
 
 
 updateIcon();
+
 

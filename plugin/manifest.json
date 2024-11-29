@@ -1,31 +1,37 @@
 
 {
-    "name": "Cursor Tracker",
-    "version": "1.0",
-    "manifest_version": 3,
-    "content_scripts": [
-      {
-        "matches": ["<all_urls>"],
-        "js": ["content.js"]
-      }
-    ],
-    "permissions": ["storage", "tabs"]
-    ,
-    "background": {
-      "service_worker": "background.js"
-    },
-    "action": {
-      "default_popup": "popup.html",
-      "default_icon": {
-        "16": "icon_red.png",
-        "24": "icon_red.png",
-        "32": "icon_red.png"
-      },
-    "icons": {
+  "name": "Cursor Tracker",
+  "version": "1.0",
+  "manifest_version": 3,
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["apriltags/*.svg"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "permissions": ["storage", "tabs", "scripting", "activeTab"]
+  ,
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
       "16": "icon_red.png",
       "24": "icon_red.png",
       "32": "icon_red.png"
-    }
+    },
+  "icons": {
+    "16": "icon_red.png",
+    "24": "icon_red.png",
+    "32": "icon_red.png"
   }
-  }
-  
+},
+"host_permissions": ["<all_urls>"]
+}
