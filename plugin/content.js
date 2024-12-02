@@ -7,6 +7,75 @@ let currentElement = null; // Currently hovered element
 let gazeCoords = { x: 0, y: 0 };
 
 
+
+////////////////////////////////
+// Create the gaze circle
+const gazeCircle = document.createElement("div");
+gazeCircle.id = "gaze-circle";
+gazeCircle.style.position = "absolute";
+gazeCircle.style.width = "20px";
+gazeCircle.style.height = "20px";
+gazeCircle.style.backgroundColor = "blue";
+gazeCircle.style.borderRadius = "50%";
+gazeCircle.style.pointerEvents = "none";
+gazeCircle.style.zIndex = "9999";
+gazeCircle.style.display = "none";
+document.body.appendChild(gazeCircle);
+
+// Smoothing variables
+let smoothedX = null;
+let smoothedY = null;
+const smoothingFactor = 0.8; // Adjust between 0.0 and 1.0 for desired smoothing
+
+// Function to update gaze circle with smoothing
+function updateGazeCircle(rawX, rawY) {
+    rawX = rawX * window.innerWidth
+    rawY = window.innerHeight - (rawY * window.innerHeight)
+
+    if (smoothedX === null || smoothedY === null) {
+        // Initialize smoothed values if not already set
+        smoothedX = rawX;
+        smoothedY = rawY;
+    } else {
+        // Apply smoothing
+        smoothedX = smoothedX * smoothingFactor + rawX * (1.0 - smoothingFactor);
+        smoothedY = smoothedY * smoothingFactor + rawY * (1.0 - smoothingFactor);
+    }
+
+    // Update the circle's position
+    gazeCircle.style.left = `${smoothedX}px`;
+    gazeCircle.style.top = `${smoothedY}px`;
+    gazeCircle.style.display = "block"; // Show the circle
+}
+
+//////////////////////////////////////
+// Establish a long-lived connection with the background script
+const port = chrome.runtime.connect({ name: 'gazeTracking' });
+
+port.onMessage.addListener((message) => {
+    // if (message.command === 'updateGazeCoords') {
+    //     gazeCoords.x = message.gazeX;
+    //     gazeCoords.y = message.gazeY;
+    //     console.log('Received Gaze Coordinates:', gazeCoords);
+    // }
+    gazeCoords.x = message.gazeX;
+    gazeCoords.y = message.gazeY;
+    console.log('Received Gaze Coordinates:', gazeCoords);
+
+    updateGazeCircle(gazeCoords.x , gazeCoords.y)
+
+
+    const element = document.elementFromPoint(gazeCoords.x, gazeCoords.y);
+    
+    // Apply a bright blue border to the element being tracked
+    element.style.border = '2px solid #00f';
+
+
+});
+
+
+
+
 function injectSvgToCorner(filePath, position) {
     // Get the full URL of the SVG file
     const imgURL = chrome.runtime.getURL(filePath);

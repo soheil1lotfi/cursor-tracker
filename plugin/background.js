@@ -4,8 +4,10 @@ let trackingState = {
     trackedData: [], // Object to store tracked data for each URL
     currentPageUrl: '', // String to store the current page URL
     currentPageId: '' // String to store the current page URL
-
 };
+
+let ws = null;
+let contentPort = null;
 
 // Function to toggle the tracking state
 const toggleTracking = () => {
@@ -50,7 +52,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.command === 'getTrackingState') {
         sendResponse(trackingState);
     } else if (message.command === 'updateTrackedData') {
-        trackingState.trackedData.push(...message.data); // Add all elements to the list
+        trackingState.trackedData.push(...message.data);
+        appendDataToCsv();
         chrome.runtime.sendMessage({ command: 'updateTrackedDataAll', data: trackingState.trackedData });
     } else if (message.command === 'toggleTracking') {
         toggleTracking();
@@ -86,9 +89,29 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
     });
 });
 
+// Handle incoming connections from content scripts
+chrome.runtime.onConnect.addListener((port) => {
+    if (port.name === 'gazeTracking') {
+        console.log('Content script connected via long-lived connection.');
+        contentPort = port;
+
+        // Handle messages from the content script if needed
+        port.onMessage.addListener((message) => {
+            console.log('Message received from content script:', message);
+            // You can handle specific requests from the content script here
+        });
+
+        port.onDisconnect.addListener(() => {
+            console.log('Content script disconnected.');
+            contentPort = null;
+        });
+    }
+});
+
 function connectWebSocket() {
-    const ws = new WebSocket('ws://localhost:8765');
+    ws = new WebSocket('ws://localhost:8765');
     ws.binaryType = 'arraybuffer';
+
     let gazeX = 0
     let gazeY = 0
 
@@ -131,31 +154,47 @@ function connectWebSocket() {
     // };
 
 
-    // Binray receiver
+    // // Binray receiver
+    // ws.onmessage = (event) => {
+    //     const buffer = new DataView(event.data);
+    //     gazeX = buffer.getInt16(0, true); // Pre-multiplied to screen coordinates
+    //     gazeY = buffer.getInt16(2, true);
+    
+    //     console.log(`Screen Coordinates: ${gazeX}, ${gazeY}`);
+    //   // Optionally, send message to the content script of the active tab
+    //     chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+
+    //     let activeTab = trackingState.currentPageId
+    //     if (tabs.length) {
+    //         chrome.tabs.sendMessage(activeTab, { command: 'updateGazeCoords', gazeX, gazeY }, (response) => {
+    //             if (chrome.runtime.lastError) {
+    //                 console.error("Error sending message:", chrome.runtime.lastError);
+    //         } else {
+    //             console.log("Message sent to content script:", response);
+    //         }
+    //     });
+    //     } else {
+    //         console.log("No active tabs found");
+    //     }
+    // });
+    // };
+    
+    // On message long-lived port binary
     ws.onmessage = (event) => {
         const buffer = new DataView(event.data);
-        const gazeX = buffer.getInt16(0, true); // Pre-multiplied to screen coordinates
-        const gazeY = buffer.getInt16(2, true);
-    
-        console.log(`Screen Coordinates: X=${gazeX}, Y=${gazeY}`);
-      // Optionally, send message to the content script of the active tab
-        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+        // gazeX = buffer.getInt16(0, true); // Pre-multiplied to screen coordinates
+        // gazeY = buffer.getInt16(2, true);
+        gazeX = buffer.getFloat32(0, true);
+        gazeY = buffer.getFloat32(4, true);
 
-        let activeTab = trackingState.currentPageId
-        if (tabs.length) {
-            chrome.tabs.sendMessage(activeTab, { command: 'updateGazeCoords', gazeX, gazeY }, (response) => {
-                if (chrome.runtime.lastError) {
-                    console.error("Error sending message:", chrome.runtime.lastError);
-            } else {
-                console.log("Message sent to content script:", response);
-            }
-        });
-        } else {
-            console.log("No active tabs found");
+
+        console.log(`Screen Coordinates: X=${gazeX}, Y=${gazeY}`);
+
+        // Send gaze data to content script via long-lived connection
+        if (contentPort) {
+            contentPort.postMessage({gazeX, gazeY});
         }
-    });
     };
-    
 
     ws.onerror = (error) => {
         console.error('WebSocket error:', error);
@@ -163,14 +202,39 @@ function connectWebSocket() {
 
     ws.onclose = () => {
         console.log('WebSocket connection closed, retrying in 1 second');
-      setTimeout(connectWebSocket, 1000); // Retry connection after 1 second
+        setTimeout(connectWebSocket, 1000); // Retry connection after 1 second
     };
 }
 
-  // Start the WebSocket connection
-    connectWebSocket();
+// Start the WebSocket connection
+connectWebSocket();
 
 
 updateIcon();
+
+// Function to append tracked data to the CSV content in local storage
+const appendDataToCsv = () => {
+    const batchSize = 1000;
+    if (trackingState.trackedData.length >= batchSize) {
+        const batch = trackingState.trackedData.splice(0, batchSize);
+        const newCsvContent = batch.map(data => 
+            `${data[0]},"${data[1].replace(/"/g, '""')}","${data[2]}",${data[3]},${data[4]},${data[5]},${data[6]},${data[7]}`
+        ).join('\n');
+
+        // Retrieve existing CSV content from local storage
+        chrome.storage.local.get({ csvData: '' }, (result) => {
+            const existingCsvData = result.csvData;
+            const updatedCsvData = existingCsvData + newCsvContent + '\n';
+            
+            // Save the updated CSV content back to local storage
+            chrome.storage.local.set({ csvData: updatedCsvData }, () => {
+                console.log('New batch appended to CSV in local storage');
+            });
+        });
+
+        // Clear the trackedData array after saving the batch
+        trackingState.trackedData = [];
+    }
+};
 
 

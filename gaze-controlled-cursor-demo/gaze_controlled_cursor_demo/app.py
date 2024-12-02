@@ -209,12 +209,11 @@ class PupilPointerApp(QApplication):
 
     # Binary sending function
     async def send_gaze_coordinates(self, gaze_x, gaze_y):
-        # Scale gaze coordinates to screen resolution (multiplied by 1000)
-        scaled_gaze_x = max(-32000, min(32000, int(gaze_x * 1000)))  # Limit to int16 range
-        scaled_gaze_y = max(-32000, min(32000, int(gaze_y * 1000)))
+
+        print(f'String: {gaze_x}, {gaze_y}')
 
         # Pack the integers into a binary format (two int16 values)
-        binary_message = struct.pack('hh', scaled_gaze_x, scaled_gaze_y)
+        binary_message = struct.pack('ff', gaze_x, gaze_y)
 
         if self.websocket_clients:
             await asyncio.wait(
