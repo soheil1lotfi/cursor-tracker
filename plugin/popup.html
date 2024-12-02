@@ -4,13 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Extension Popup</title>
+    <style>
+        .toggle-container {
+            margin-bottom: 10px;
+        }
+    </style>
 </head>
 <body>
     <h1>Cursor Tracker</h1>
     <div id="buttons">
+        <div class="toggle-container">
+            <label for="gazeTrackingToggle">Gaze Tracking</label>
+            <input type="checkbox" id="gazeTrackingToggle">
+        </div>
+        <div class="toggle-container" id="showGazeLocationContainer" style="display: none;">
+            <label for="showGazeLocationToggle">Show Gaze Location</label>
+            <input type="checkbox" id="showGazeLocationToggle">
+        </div>
+        <div class="toggle-container" id="tagSizeContainer" style="display: none;">
+            <label for="tagSizeInput">Tag Size</label>
+            <input type="number" id="tagSizeInput" value="200" min="50" max="500">
+        </div>
         <button id="startButton">Start Tracking</button>
         <button id="stopButton" style="display: none;">Stop Tracking</button>
         <button id="exportButton">Export</button>
+        <button id="downloadCsvButton">Download CSV</button>
+        <button id="downloadGazeCsvButton">Download Gaze CSV</button>
     </div>
     <textarea id="trackedData" rows="10" cols="50" readonly></textarea>
     <script src="popup.js"></script>

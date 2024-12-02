@@ -6,7 +6,76 @@ let hoverTimeout = null; // Timer for hover detection
 let currentElement = null; // Currently hovered element
 let gazeCoords = { x: 0, y: 0 };
 
+let gazeTrackingEnabled = false;
+let showGazeLocation = false;
+let tagSize = 200;
 
+// Function to toggle apriltags visibility
+const toggleApriltags = (enabled) => {
+    const apriltags = document.querySelectorAll('.apriltag');
+    console.log(`Toggling apriltags: ${enabled ? 'show' : 'hide'}`); // Debug log
+    apriltags.forEach(tag => {
+        tag.style.display = enabled ? 'block' : 'none';
+        console.log(`Apriltag visibility set to: ${tag.style.display}`); // Debug log
+    });
+};
+
+// Function to update tag size
+const updateTagSize = (size) => {
+    const apriltags = document.querySelectorAll('.apriltag');
+    apriltags.forEach(tag => {
+        tag.style.width = `${size}px`;
+        tag.style.height = `${size}px`;
+    });
+};
+
+// Listen for messages from the popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.command === 'toggleGazeTracking') {
+        gazeTrackingEnabled = message.enabled;
+        toggleApriltags(gazeTrackingEnabled);
+    } else if (message.command === 'toggleGazeLocation') {
+        showGazeLocation = message.enabled;
+        gazeCircle.style.display = showGazeLocation ? 'block' : 'none';
+    } else if (message.command === 'updateTagSize') {
+        tagSize = message.size;
+        updateTagSize(tagSize);
+    }
+});
+
+// Initialize apriltags
+const injectApriltag = (filePath, position) => {
+    const imgURL = chrome.runtime.getURL(filePath);
+    const img = document.createElement("img");
+    img.src = imgURL;
+    img.width = tagSize;
+    img.height = tagSize;
+    img.className = 'apriltag';
+    img.style.position = "fixed";
+    img.style.zIndex = "9999";
+    img.style.pointerEvents = "none";
+    img.style.display = "none"; // Ensure initially hidden
+    // Set position based on which corner is specified
+    if (position === "top-left") {
+        img.style.top = "0";
+        img.style.left = "0";
+    } else if (position === "top-right") {
+        img.style.top = "0";
+        img.style.right = "0";
+    } else if (position === "bottom-left") {
+        img.style.bottom = "0";
+        img.style.left = "0";
+    } else if (position === "bottom-right") {
+        img.style.bottom = "0";
+        img.style.right = "0";
+    }
+    document.body.appendChild(img);
+};
+
+injectApriltag("apriltags/tag36h11-0.svg", "top-left");
+injectApriltag("apriltags/tag36h11-1.svg", "top-right");
+injectApriltag("apriltags/tag36h11-2.svg", "bottom-right");
+injectApriltag("apriltags/tag36h11-3.svg", "bottom-left");
 
 ////////////////////////////////
 // Create the gaze circle
@@ -53,11 +122,6 @@ function updateGazeCircle(rawX, rawY) {
 const port = chrome.runtime.connect({ name: 'gazeTracking' });
 
 port.onMessage.addListener((message) => {
-    // if (message.command === 'updateGazeCoords') {
-    //     gazeCoords.x = message.gazeX;
-    //     gazeCoords.y = message.gazeY;
-    //     console.log('Received Gaze Coordinates:', gazeCoords);
-    // }
     gazeCoords.x = message.gazeX;
     gazeCoords.y = message.gazeY;
     console.log('Received Gaze Coordinates:', gazeCoords);
@@ -107,8 +171,8 @@ function injectSvgToCorner(filePath, position) {
         img.style.right = "0";
     }
 
-    // Append the img to the body
-    document.body.appendChild(img);
+    // // Append the img to the body
+    // document.body.appendChild(img);
 
     // // Log to confirm that the element was appended successfully
     // console.log(`Injected SVG in ${position}`, img);
@@ -127,6 +191,11 @@ const startTracking = () => {
 
         // Add event listener to track mouse movements
         document.addEventListener('mousemove', trackMouse);
+
+        // If gaze tracking is enabled, start recording gaze data
+        if (gazeTrackingEnabled) {
+            port.onMessage.addListener(recordGazeData);
+        }
     }
 };
 
@@ -138,28 +207,27 @@ const stopTracking = () => {
         // Remove the event listener for mouse movements
         document.removeEventListener('mousemove', trackMouse);
 
+        // If gaze tracking was enabled, stop recording gaze data
+        if (gazeTrackingEnabled) {
+            port.onMessage.removeListener(recordGazeData);
+        }
+
         // Send tracked data to the background script for storage
         chrome.runtime.sendMessage({ command: 'updateTrackedData', data: trackedData });
     }
 };
 
-
-// // Function to handle mouse movements and track data //Old function with no click event recording
-// const trackMouse = (event) => {
-//     const element = document.elementFromPoint(event.clientX, event.clientY);
-    
-//     if (element !== currentElement) {
-//         // If the mouse moves to a new element, clear the previous timer
-//         clearTimeout(hoverTimeout);
-//         currentElement = element;
-        
-//         // Start a new timer for the new element
-//         hoverTimeout = setTimeout(() => {
-//             recordElement(element, event);
-//         }, 1000); // 1 second
-//     }
-// };
-
+// Function to record gaze data
+const recordGazeData = (message) => {
+    if (gazeTrackingEnabled) {
+        const gazeData = {
+            x: message.gazeX,
+            y: message.gazeY,
+            timestamp: new Date().toISOString()
+        };
+        chrome.runtime.sendMessage({ command: 'recordGazeData', data: gazeData });
+    }
+};
 
 // Function to handle mouse movements and track data
 const trackMouse = (event) => {
@@ -192,13 +260,11 @@ const handleElementClick = (event) => {
 
 // Function to record the element after the mouse has been over it for 1 second
 const recordElement = (element, event, clicked) => {
-    
     if (element !== null && element !== undefined) {
         // Get the mouse position relative to the entire webpage
         const pageX = event.clientX + window.scrollX;
         const pageY = event.clientY + window.scrollY;
         
-        console.log(pageX)
         // Create an object to store element details
         const elementData = [
             window.location.href, // URL

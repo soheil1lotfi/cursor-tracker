@@ -8,6 +8,7 @@ let trackingState = {
 
 let ws = null;
 let contentPort = null;
+let gazeData = [];
 
 // Function to toggle the tracking state
 const toggleTracking = () => {
@@ -52,8 +53,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.command === 'getTrackingState') {
         sendResponse(trackingState);
     } else if (message.command === 'updateTrackedData') {
-        trackingState.trackedData.push(...message.data);
-        appendDataToCsv();
+        trackingState.trackedData.push(...message.data); // Add all elements to the list
         chrome.runtime.sendMessage({ command: 'updateTrackedDataAll', data: trackingState.trackedData });
     } else if (message.command === 'toggleTracking') {
         toggleTracking();
@@ -65,10 +65,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chrome.runtime.sendMessage({ command: trackingState.isTracking ? 'trackingStarted' : 'trackingStopped' });
     } else if (message.command === 'getTrackedData') {
         sendResponse(trackingState.trackedData);
-    } 
-    // else if (message.command === 'getGazeCoords') {
-    //     sendResponse([gazeX, gazeY]);
-    // }
+    } else if (message.command === 'recordGazeData') {
+        gazeData.push(message.data);
+        if (gazeData.length >= 10) { // Save every 10 records for example
+            saveGazeDataToFile();
+        }
+    } else if (message.command === 'downloadGazeCsv') {
+        downloadGazeDataCsv();
+    }
 });
 
 
@@ -212,29 +216,33 @@ connectWebSocket();
 
 updateIcon();
 
-// Function to append tracked data to the CSV content in local storage
-const appendDataToCsv = () => {
-    const batchSize = 1000;
-    if (trackingState.trackedData.length >= batchSize) {
-        const batch = trackingState.trackedData.splice(0, batchSize);
-        const newCsvContent = batch.map(data => 
-            `${data[0]},"${data[1].replace(/"/g, '""')}","${data[2]}",${data[3]},${data[4]},${data[5]},${data[6]},${data[7]}`
-        ).join('\n');
+// Function to save gaze data to a file
+const saveGazeDataToFile = () => {
+    const csvContent = "data:text/csv;charset=utf-8,Gaze X,Gaze Y,Timestamp\n" +
+        gazeData.map(data => `${data.x},${data.y},${data.timestamp}`).join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "gaze_data.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
-        // Retrieve existing CSV content from local storage
-        chrome.storage.local.get({ csvData: '' }, (result) => {
-            const existingCsvData = result.csvData;
-            const updatedCsvData = existingCsvData + newCsvContent + '\n';
-            
-            // Save the updated CSV content back to local storage
-            chrome.storage.local.set({ csvData: updatedCsvData }, () => {
-                console.log('New batch appended to CSV in local storage');
-            });
-        });
+    // Clear the gaze data array after saving
+    gazeData = [];
+};
 
-        // Clear the trackedData array after saving the batch
-        trackingState.trackedData = [];
-    }
+// Function to download gaze data as a CSV file
+const downloadGazeDataCsv = () => {
+    const csvContent = "data:text/csv;charset=utf-8,Gaze X,Gaze Y,Timestamp\n" +
+        gazeData.map(data => `${data.x},${data.y},${data.timestamp}`).join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "gaze_data.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
 
 
