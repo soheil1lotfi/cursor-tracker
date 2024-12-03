@@ -54,7 +54,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(trackingState);
     } else if (message.command === 'updateTrackedData') {
         trackingState.trackedData.push(...message.data); // Add all elements to the list
-        chrome.runtime.sendMessage({ command: 'updateTrackedDataAll', data: trackingState.trackedData });
+        console.log('Tracked data updated:', trackingState.trackedData); // Debug log
+    } else if (message.command === 'getTrackedData') {
+        console.log('Sending tracked data:', trackingState.trackedData); // Debug log
+        sendResponse(trackingState.trackedData);
     } else if (message.command === 'toggleTracking') {
         toggleTracking();
         chrome.tabs.query({}, (tabs) => {
@@ -63,8 +66,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             });
         });
         chrome.runtime.sendMessage({ command: trackingState.isTracking ? 'trackingStarted' : 'trackingStopped' });
-    } else if (message.command === 'getTrackedData') {
-        sendResponse(trackingState.trackedData);
     } else if (message.command === 'recordGazeData') {
         gazeData.push(message.data);
         if (gazeData.length >= 10) { // Save every 10 records for example
@@ -72,6 +73,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
     } else if (message.command === 'downloadGazeCsv') {
         downloadGazeDataCsv();
+    } else if (message.command === 'startTracking') {
+        trackingState.isTracking = true;
+        chrome.tabs.query({}, (tabs) => {
+            tabs.forEach((tab) => {
+                chrome.tabs.sendMessage(tab.id, { command: 'startTracking' });
+            });
+        });
+    } else if (message.command === 'pauseTracking') {
+        trackingState.isTracking = false;
+        chrome.tabs.query({}, (tabs) => {
+            tabs.forEach((tab) => {
+                chrome.tabs.sendMessage(tab.id, { command: 'pauseTracking' });
+            });
+        });
+    } else if (message.command === 'continueTracking') {
+        trackingState.isTracking = true;
+        chrome.tabs.query({}, (tabs) => {
+            tabs.forEach((tab) => {
+                chrome.tabs.sendMessage(tab.id, { command: 'continueTracking' });
+            });
+        });
+    } else if (message.command === 'stopTracking') {
+        trackingState.isTracking = false;
+        chrome.tabs.query({}, (tabs) => {
+            tabs.forEach((tab) => {
+                chrome.tabs.sendMessage(tab.id, { command: 'stopTracking' });
+            });
+        });
+        chrome.runtime.sendMessage({ command: 'trackingStopped' });
     }
 });
 

@@ -182,20 +182,78 @@ injectSvgToCorner("apriltags/tag36h11-1.svg", "top-right");
 injectSvgToCorner("apriltags/tag36h11-2.svg", "bottom-right");
 injectSvgToCorner("apriltags/tag36h11-3.svg", "bottom-left");
 
+// Function to create and display the countdown overlay
+const showCountdownOverlay = (callback) => {
+    const overlay = document.createElement('div');
+    overlay.id = 'countdown-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    overlay.style.color = 'white';
+    overlay.style.fontSize = '48px';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.zIndex = '10000';
+    overlay.style.transition = 'opacity 0.3s ease'; // Add transition for smoother appearance
+    document.body.appendChild(overlay);
+
+    let countdown = 3;
+    overlay.textContent = countdown;
+
+    const countdownInterval = setInterval(() => {
+        countdown -= 1;
+        if (countdown > 0) {
+            overlay.textContent = countdown;
+        } else {
+            clearInterval(countdownInterval);
+            document.body.removeChild(overlay);
+            callback();
+        }
+    }, 1000);
+};
 
 // Function to start tracking
 const startTracking = () => {
     if (!isTracking) {
-        isTracking = true;
-        trackedData = [];
+        showCountdownOverlay(() => {
+            isTracking = true;
+            trackedData = [];
 
-        // Add event listener to track mouse movements
-        document.addEventListener('mousemove', trackMouse);
+            // Add event listener to track mouse movements
+            document.addEventListener('mousemove', trackMouse);
 
-        // If gaze tracking is enabled, start recording gaze data
-        if (gazeTrackingEnabled) {
-            port.onMessage.addListener(recordGazeData);
-        }
+            // If gaze tracking is enabled, start recording gaze data
+            if (gazeTrackingEnabled) {
+                port.onMessage.addListener(recordGazeData);
+            }
+        });
+    }
+};
+
+// Function to continue tracking
+const continueTracking = () => {
+    console.log('Attempting to continue tracking');
+    console.log('Current isTracking state:', isTracking); // Debugging log
+    if (!isTracking) { // Ensure this condition is correct
+        console.log('Showing countdown overlay for continue tracking');
+        showCountdownOverlay(() => {
+            isTracking = true;
+            console.log('Tracking continued after countdown');
+
+            // Add event listener to track mouse movements
+            document.addEventListener('mousemove', trackMouse);
+
+            // If gaze tracking is enabled, start recording gaze data
+            if (gazeTrackingEnabled) {
+                port.onMessage.addListener(recordGazeData);
+            }
+        });
+    } else {
+        console.log('Tracking is already active, no need to continue');
     }
 };
 
@@ -280,17 +338,18 @@ const recordElement = (element, event, clicked) => {
         ];
         trackedData.push(elementData);
         
-        // Debuger log
+        // Debug log
         console.log(elementData);
-        
 
         // Apply a bright blue border to the element being tracked
-        element.style.border = '2px solid #00f';
-    
+        element.style.outline = '2px solid #00f';
+        setTimeout(() => {
+            element.style.outline = 'none';
+        }, 1000);
         // Remove the border when the mouse leaves the element
-        element.addEventListener('mouseleave', () => {
-            element.style.border = 'none';
-        });
+        // element.addEventListener('mouseleave', () => {
+        //     element.style.outline = 'none';
+        // });
     }
 };
 
@@ -302,13 +361,36 @@ chrome.runtime.sendMessage({ command: 'getTrackingState' }, (response) => {
     }
 });
 
-// Listen for messages from the background script to start or stop tracking
+// Function to pause tracking
+const pauseTracking = () => {
+    if (isTracking) {
+        isTracking = false;
+        console.log('Tracking paused');
+
+        // Remove the event listener for mouse movements
+        document.removeEventListener('mousemove', trackMouse);
+
+        // If gaze tracking was enabled, stop recording gaze data
+        if (gazeTrackingEnabled) {
+            port.onMessage.removeListener(recordGazeData);
+        }
+    }
+};
+
+// Listen for messages from the background script to start, stop, or pause tracking
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('Received message:', message.command);
     if (message.command === 'startTracking') {
         startTracking();
     } 
     else if (message.command === 'stopTracking') {
         stopTracking();
+    }
+    else if (message.command === 'pauseTracking') {
+        pauseTracking();
+    }
+    else if (message.command === 'continueTracking') {
+        continueTracking();
     }
     else if (message.command === 'updateGazeCoords') {
         gazeCoords.x = message.gazeX;
