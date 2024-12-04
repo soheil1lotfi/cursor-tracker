@@ -4,28 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Extension Popup</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-    <h2>Cursor Tracker</h2>
-    <div id="buttons">
-        <div class="toggle-container">
-            <label for="gazeTrackingToggle">Gaze Tracking</label>
-            <input type="checkbox" id="gazeTrackingToggle">
+    <div class="container p-3">
+        <h2 class="text-center mb-4"><i class="bi bi-eye"></i> Cursor Tracker</h2>
+        
+        <div class="card">
+            <div class="card-body">
+                <div class="form-group mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="gazeTrackingToggle">
+                        <label class="form-check-label" for="gazeTrackingToggle">Gaze Tracking</label>
+                    </div>
+                </div>
+
+                <div class="form-group mb-3" id="showGazeLocationContainer" style="display: none;">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="showGazeLocationToggle">
+                        <label class="form-check-label" for="showGazeLocationToggle">Show Gaze Location</label>
+                    </div>
+                </div>
+
+                <div class="form-group mb-4" id="tagSizeContainer" style="display: none;">
+                    <label for="tagSizeInput" class="form-label">Tag Size</label>
+                    <input type="range" class="form-range" id="tagSizeInput" value="200" min="50" max="500">
+                    <div class="text-center"><span id="tagSizeValue">200</span>px</div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <button id="startPauseButton" class="btn btn-primary w-100">Start Tracking</button>
+                        </div>
+                        <div class="col-6">
+                            <button id="stopButton" class="btn btn-danger w-100">Stop Tracking</button>
+                        </div>
+                    </div>
+                    <button id="downloadCsvButton" class="btn btn-outline-dark">Download CSV</button>
+                    <button id="downloadGazeCsvButton" class="btn btn-outline-dark">Download Gaze CSV</button>
+                </div>
+            </div>
         </div>
-        <div class="toggle-container" id="showGazeLocationContainer" style="display: none;">
-            <label for="showGazeLocationToggle">Show Gaze Location</label>
-            <input type="checkbox" id="showGazeLocationToggle">
-        </div>
-        <div class="toggle-container" id="tagSizeContainer" style="display: none;">
-            <label for="tagSizeInput">Tag Size</label>
-            <input type="number" id="tagSizeInput" value="200" min="50" max="500">
-        </div>
-        <button id="startPauseButton">Start Tracking</button>
-        <button id="stopButton">Stop Tracking</button>
-        <button id="downloadCsvButton">Download CSV</button>
-        <button id="downloadGazeCsvButton">Download Gaze CSV</button>
     </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>

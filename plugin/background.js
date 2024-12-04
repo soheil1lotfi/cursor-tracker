@@ -51,13 +51,24 @@ const updateIcon = () => {
 // Listen for messages from the content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.command === 'getTrackingState') {
-        sendResponse(trackingState);
+        // Retrieve tracking state from storage
+        chrome.storage.local.get(['isTracking', 'trackedData'], (result) => {
+            trackingState.isTracking = result.isTracking || false;
+            trackingState.trackedData = result.trackedData || [];
+            sendResponse(trackingState);
+        });
+        return true; // Indicate async response
     } else if (message.command === 'updateTrackedData') {
         trackingState.trackedData.push(...message.data); // Add all elements to the list
         console.log('Tracked data updated:', trackingState.trackedData); // Debug log
     } else if (message.command === 'getTrackedData') {
-        console.log('Sending tracked data:', trackingState.trackedData); // Debug log
-        sendResponse(trackingState.trackedData);
+        // Retrieve all tracked data from storage
+        chrome.storage.local.get(['trackedData'], (result) => {
+            const allTrackedData = result.trackedData || [];
+            console.log('Sending tracked data:', allTrackedData); // Debug log
+            sendResponse(allTrackedData);
+        });
+        return true; // Indicate async response
     } else if (message.command === 'toggleTracking') {
         toggleTracking();
         chrome.tabs.query({}, (tabs) => {
@@ -68,11 +79,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chrome.runtime.sendMessage({ command: trackingState.isTracking ? 'trackingStarted' : 'trackingStopped' });
     } else if (message.command === 'recordGazeData') {
         gazeData.push(message.data);
-        if (gazeData.length >= 10) { // Save every 10 records for example
-            saveGazeDataToFile();
-        }
+        saveGazeDataBatch(); // Save in batches
     } else if (message.command === 'downloadGazeCsv') {
+        console.log('Received downloadGazeCsv command');
         downloadGazeDataCsv();
+        sendResponse({ status: "success" });
     } else if (message.command === 'startTracking') {
         trackingState.isTracking = true;
         chrome.tabs.query({}, (tabs) => {
@@ -102,6 +113,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             });
         });
         chrome.runtime.sendMessage({ command: 'trackingStopped' });
+    } else if (message.command === 'clearTrackedData') {
+        // Clear tracked data from storage
+        chrome.storage.local.set({ trackedData: [] }, () => {
+            console.log('Tracked data cleared from local storage');
+            sendResponse({ status: "success" });
+        });
+        return true; // Indicate async response
     }
 });
 
@@ -246,33 +264,38 @@ connectWebSocket();
 
 updateIcon();
 
-// Function to save gaze data to a file
-const saveGazeDataToFile = () => {
-    const csvContent = "data:text/csv;charset=utf-8,Gaze X,Gaze Y,Timestamp\n" +
-        gazeData.map(data => `${data.x},${data.y},${data.timestamp}`).join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "gaze_data.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+// Function to save gaze data in batches to local storage
+const saveGazeDataBatch = () => {
+    if (gazeData.length >= 10) {
+        // Retrieve existing data from local storage
+        chrome.storage.local.get(['gazeData'], (result) => {
+            const existingData = result.gazeData || [];
+            const newBatch = gazeData.splice(0, 10); // Get the first 10 items
+            const updatedData = existingData.concat(newBatch);
 
-    // Clear the gaze data array after saving
-    gazeData = [];
+            // Save the updated data back to local storage
+            chrome.storage.local.set({ gazeData: updatedData }, () => {
+                console.log('Gaze data batch saved to local storage');
+            });
+        });
+    }
 };
 
-// Function to download gaze data as a CSV file
+// Function to download gaze data as a CSV file from local storage
 const downloadGazeDataCsv = () => {
-    const csvContent = "data:text/csv;charset=utf-8,Gaze X,Gaze Y,Timestamp\n" +
-        gazeData.map(data => `${data.x},${data.y},${data.timestamp}`).join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "gaze_data.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    chrome.storage.local.get(['gazeData'], (result) => {
+        const storedData = result.gazeData || [];
+        const csvContent = "data:text/csv;charset=utf-8,Gaze X,Gaze Y,Timestamp\n" +
+            storedData.map(data => `${data.x},${data.y},${data.timestamp}`).join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "gaze_data.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log('Gaze data CSV download triggered');
+    });
 };
 
 

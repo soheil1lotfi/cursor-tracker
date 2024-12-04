@@ -158,7 +158,6 @@ class PupilPointerApp(QApplication):
                     self.send_gaze_coordinates(surface_gaze.x, surface_gaze.y),
                     self.websocket_loop,
                 )
-
     async def websocket_handler(self, websocket):
         self.websocket_clients.add(websocket)
         try:

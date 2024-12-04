@@ -9,7 +9,8 @@ let gazeCoords = { x: 0, y: 0 };
 let gazeTrackingEnabled = false;
 let showGazeLocation = false;
 let tagSize = 200;
-
+let windowWidth = window.innerWidth;
+let windowHeight = window.innerHeight;
 // Function to toggle apriltags visibility
 const toggleApriltags = (enabled) => {
     const apriltags = document.querySelectorAll('.apriltag');
@@ -40,6 +41,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } else if (message.command === 'updateTagSize') {
         tagSize = message.size;
         updateTagSize(tagSize);
+    } else if (message.command === 'saveTrackingState') {
+        console.log('Saving tracking state, current data:', trackedData);
+        if (isTracking && trackedData.length > 0) {
+            saveTrackingState();
+        }
+        // Important: Send response back with the current trackedData
+        sendResponse({ 
+            status: 'success',
+            data: trackedData 
+        });
+        return true; // Required for async response
     }
 });
 
@@ -82,8 +94,8 @@ injectApriltag("apriltags/tag36h11-3.svg", "bottom-left");
 const gazeCircle = document.createElement("div");
 gazeCircle.id = "gaze-circle";
 gazeCircle.style.position = "absolute";
-gazeCircle.style.width = "20px";
-gazeCircle.style.height = "20px";
+gazeCircle.style.width = "30px";
+gazeCircle.style.height = "30px";
 gazeCircle.style.backgroundColor = "blue";
 gazeCircle.style.borderRadius = "50%";
 gazeCircle.style.pointerEvents = "none";
@@ -94,12 +106,12 @@ document.body.appendChild(gazeCircle);
 // Smoothing variables
 let smoothedX = null;
 let smoothedY = null;
-const smoothingFactor = 0.8; // Adjust between 0.0 and 1.0 for desired smoothing
+const smoothingFactor = 0.85; // Adjust between 0.0 and 1.0 for desired smoothing
 
 // Function to update gaze circle with smoothing
 function updateGazeCircle(rawX, rawY) {
-    rawX = rawX * window.innerWidth
-    rawY = window.innerHeight - (rawY * window.innerHeight)
+    rawX = rawX * windowWidth
+    rawY = innerHeight - (rawY * innerHeight)
 
     if (smoothedX === null || smoothedY === null) {
         // Initialize smoothed values if not already set
@@ -131,8 +143,8 @@ port.onMessage.addListener((message) => {
 
     const element = document.elementFromPoint(gazeCoords.x, gazeCoords.y);
     
-    // Apply a bright blue border to the element being tracked
-    element.style.border = '2px solid #00f';
+    // // Apply a bright blue border to the element being tracked
+    // element.style.border = '2px solid #00f';
 
 
 });
@@ -216,12 +228,53 @@ const showCountdownOverlay = (callback) => {
     }, 1000);
 };
 
+// Initialize the content script by retrieving the tracking state from storage
+chrome.storage.local.get(['isTracking', 'trackedData'], (result) => {
+    if (result.isTracking) {
+        isTracking = true;
+        trackedData = result.trackedData || [];
+        // Start tracking immediately if it was active
+        document.addEventListener('mousemove', trackMouse);
+        
+        // If gaze tracking is enabled, start recording gaze data
+        if (gazeTrackingEnabled) {
+            port.onMessage.addListener(recordGazeData);
+        }
+    }
+});
+
+// Listen for messages from the background script to start, stop, or pause tracking
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('Received message:', message.command);
+    if (message.command === 'startTracking') {
+        if (!isTracking) {
+            startTracking();
+        }
+    } 
+    else if (message.command === 'stopTracking') {
+        stopTracking();
+    }
+    else if (message.command === 'pauseTracking') {
+        pauseTracking();
+    }
+    else if (message.command === 'continueTracking') {
+        continueTracking();
+    }
+    else if (message.command === 'updateGazeCoords') {
+        gazeCoords.x = message.gazeX;
+        gazeCoords.y = message.gazeY;
+        console.log('Gaze Coordinates:', message.gazeX, message.gazeY);
+        sendResponse({ status: "success" }); // Optionally respond
+    }
+});
+
 // Function to start tracking
 const startTracking = () => {
     if (!isTracking) {
         showCountdownOverlay(() => {
             isTracking = true;
-            trackedData = [];
+            // trackedData = [];
+            saveTrackingState(); // Save state
 
             // Add event listener to track mouse movements
             document.addEventListener('mousemove', trackMouse);
@@ -261,6 +314,7 @@ const continueTracking = () => {
 const stopTracking = () => {
     if (isTracking) {
         isTracking = false;
+        saveTrackingState(); // Save state
 
         // Remove the event listener for mouse movements
         document.removeEventListener('mousemove', trackMouse);
@@ -377,26 +431,34 @@ const pauseTracking = () => {
     }
 };
 
-// Listen for messages from the background script to start, stop, or pause tracking
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log('Received message:', message.command);
-    if (message.command === 'startTracking') {
-        startTracking();
-    } 
-    else if (message.command === 'stopTracking') {
-        stopTracking();
+// Function to save tracking state
+const saveTrackingState = () => {
+    chrome.storage.local.get(['trackedData'], (result) => {
+        const existingData = result.trackedData || [];
+        // Append new data to existing data
+        const updatedData = existingData.concat(trackedData);
+        chrome.storage.local.set({ 
+            isTracking, 
+            trackedData: updatedData 
+        }, () => {
+            console.log('Tracking state saved', updatedData);
+            // Clear local trackedData after saving
+            trackedData = [];
+        });
+    });
+};
+
+// Add periodic saving to prevent data loss during navigation
+setInterval(() => {
+    if (isTracking && trackedData.length > 0) {
+        saveTrackingState();
     }
-    else if (message.command === 'pauseTracking') {
-        pauseTracking();
-    }
-    else if (message.command === 'continueTracking') {
-        continueTracking();
-    }
-    else if (message.command === 'updateGazeCoords') {
-        gazeCoords.x = message.gazeX;
-        gazeCoords.y = message.gazeY;
-        console.log('Gaze Coordinates:', message.gazeX, message.gazeY);
-        sendResponse({ status: "success" }); // Optionally respond
+}, 5000); // Save every 5 seconds if there's new data
+
+// Listen for beforeunload event to save data before page navigation
+window.addEventListener('beforeunload', () => {
+    if (isTracking && trackedData.length > 0) {
+        saveTrackingState();
     }
 });
 

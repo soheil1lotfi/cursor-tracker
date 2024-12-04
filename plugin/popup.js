@@ -9,6 +9,11 @@ const downloadGazeCsvButton = document.getElementById('downloadGazeCsvButton');
 let isTracking = false;
 let isPaused = false;
 
+// Add this near the beginning of your file, with other event listeners
+document.getElementById('tagSizeInput').addEventListener('input', function() {
+    document.getElementById('tagSizeValue').textContent = this.value;
+});
+
 // Function to update the start/pause button text
 const updateStartPauseButton = () => {
     if (isTracking) {
@@ -24,6 +29,10 @@ startPauseButton.addEventListener('click', () => {
         // Start tracking
         isTracking = true;
         isPaused = false;
+        // Clear the tracked data from local storage after download
+        chrome.runtime.sendMessage({ command: 'clearTrackedData' }, () => {
+            console.log('Tracked data cleared from local storage');
+        });
         console.log('Sending startTracking command');
         chrome.runtime.sendMessage({ command: 'startTracking' });
     } else if (isPaused) {
@@ -52,26 +61,77 @@ stopButton.addEventListener('click', () => {
 
 // Add click event listener to download CSV button
 downloadCsvButton.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ command: 'getTrackedData' }, (response) => {
-        let csvContent = "data:text/csv;charset=utf-8,URL,Element,Element Class,Element ID,Page X,Page Y, Gaze X, Gaze Y, Time Stamp, Clicked\n";
-        console.log(response.length);
-        response.forEach(data => {
-            const row = `${data[0]},"${data[1].replace(/"/g, '""')}","${data[2]}",${data[3]},${data[4]},${data[5]},${data[6]},${data[7]},${data[8]},${data[9]}\n`;
-            csvContent += row;
+    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+        chrome.tabs.sendMessage(tabs[0].id, { command: 'saveTrackingState' }, (response) => {
+            console.log('Response from content script:', response);
+            
+            // Get data from storage
+            chrome.storage.local.get(['trackedData'], (result) => {
+                console.log('Data from storage:', result.trackedData);
+                
+                const data = result.trackedData || [];
+                if (data.length === 0) {
+                    console.log('No data to download');
+                    return;
+                }
+
+                // Create CSV header
+                let csvRows = [];
+                csvRows.push(['URL', 'Element', 'Element Class', 'Element ID', 'Page X', 'Page Y', 'Gaze X', 'Gaze Y', 'Time Stamp', 'Clicked']);
+
+                // Process each row of data
+                data.forEach(row => {
+                    console.log('Processing row:', row);
+                    csvRows.push([
+                        row[0] || '',  // URL
+                        row[1] ? `"${row[1].replace(/"/g, '""')}"` : '', // Element HTML
+                        row[2] || '',  // Element Class
+                        row[3] || '',  // Element ID
+                        row[4] || '',  // Page X
+                        row[5] || '',  // Page Y
+                        row[6] || '',  // Gaze X
+                        row[7] || '',  // Gaze Y
+                        row[8] || '',  // Timestamp
+                        row[9] ? 'true' : 'false'  // Clicked
+                    ]);
+                });
+
+                console.log('Processed rows:', csvRows);
+
+                // Convert to CSV string
+                const csvContent = csvRows.map(row => row.join(',')).join('\n');
+                console.log('CSV Content:', csvContent);
+
+                // Create and trigger download
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', `tracked_data_${new Date().toISOString().replace(/:/g, '-')}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                // Clear the tracked data after successful download
+                chrome.storage.local.set({ trackedData: [] }, () => {
+                    console.log('Tracked data cleared after download');
+                });
+            });
         });
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "tracked_data.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     });
 });
 
 // Add click event listener to download gaze CSV button
 downloadGazeCsvButton.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ command: 'downloadGazeCsv' });
+    console.log('Download Gaze CSV button clicked');
+    chrome.runtime.sendMessage({ command: 'downloadGazeCsv' }, (response) => {
+        if (chrome.runtime.lastError) {
+            console.error("Error sending message:", chrome.runtime.lastError);
+        } else {
+            console.log("Message sent to background script:", response);
+        }
+    });
 });
 
 // Initialize button states based on the current tracking state
