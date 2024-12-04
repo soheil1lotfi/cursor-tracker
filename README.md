@@ -1,3 +1,44 @@
+# Cursor Tracker Chrome Extension
+
+A Chrome extension that tracks cursor movements and interactions with webpage elements, enabling detailed analysis of user behavior. The recordings persist while navigating to different web pages in a single recording session.
+
+## Features
+
+- **Cursor Movement Tracking**: Records cursor positions and hover events
+- **Element Interaction**: Tracks which elements users interact with
+- **Click Tracking**: Captures click events on elements
+- **Data Export**: Exports tracking data in CSV format
+- **Configurable Settings**: Start/pause/stop tracking as needed
+
+## Installation
+
+1. Clone this repository
+2. Open Chrome and navigate to `chrome://extensions/`
+3. Enable "Developer mode"
+4. Click "Load unpacked" and select the `plugin` folder
+
+## Usage
+
+1. Click the extension icon to open the control panel
+2. Click "Start Tracking" to begin data collection
+3. Use "Pause" to temporarily stop tracking
+4. Click "Stop" to end the session
+5. Use "Download CSV" to export tracking data
+
+## Data Format
+
+The extension exports CSV files containing:
+- URL of the tracked page
+- HTML elements interacted with
+- Element classes and IDs
+- Cursor coordinates
+- Timestamps
+- Click events
+
+## Requirements
+
+- Google Chrome browser
+
 # DOM Tracker
 ## Tracking DOM elements using cursor coordinates and gaze coordinates obtained from Pupil Neon Eyetracking glasses.
 ### Introduction
