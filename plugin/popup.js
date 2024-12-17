@@ -77,7 +77,7 @@ downloadCsvButton.addEventListener('click', () => {
 
                 // Create CSV header
                 let csvRows = [];
-                csvRows.push(['URL', 'Element', 'Element Class', 'Element ID', 'Page X', 'Page Y', 'Gaze X', 'Gaze Y', 'Time Stamp', 'Clicked']);
+                csvRows.push(['URL', 'Element', 'Element Class', 'Element ID', 'Page X', 'Page Y', 'windowX', 'windowY', 'Gaze X', 'Gaze Y', 'Time Stamp', 'Clicked']);
 
                 // Process each row of data
                 data.forEach(row => {
@@ -89,10 +89,12 @@ downloadCsvButton.addEventListener('click', () => {
                         row[3] || '',  // Element ID
                         row[4] || '',  // Page X
                         row[5] || '',  // Page Y
-                        row[6] || '',  // Gaze X
-                        row[7] || '',  // Gaze Y
-                        row[8] || '',  // Timestamp
-                        row[9] ? 'true' : 'false'  // Clicked
+                        row[6] || '',
+                        row[7] || '',
+                        row[8] || '',  // Gaze X
+                        row[9] || '',  // Gaze Y
+                        row[10] || '',  // Timestamp
+                        row[11] ? 'true' : 'false'  // Clicked
                     ]);
                 });
 

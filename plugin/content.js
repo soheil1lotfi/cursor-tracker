@@ -377,7 +377,7 @@ const trackMouse = (event) => {
             recordElement(element, event, false);
             // Add a click listener to the current element
             element.addEventListener('click', handleElementClick, true);
-        }, 1000); // 1 second
+        }, 500); // 0.5 second
     }
 };
 
@@ -394,7 +394,8 @@ const recordElement = (element, event, clicked) => {
         // Get the mouse position relative to the entire webpage
         const pageX = event.clientX + window.scrollX;
         const pageY = event.clientY + window.scrollY;
-        
+        const windowX = event.clientX
+        const windowY = event.clientY 
         // Create an object to store element details
         const elementData = [
             window.location.href, // URL
@@ -403,6 +404,8 @@ const recordElement = (element, event, clicked) => {
             element.id || null, // Element ID
             pageX || null, // Position X relative to page window
             pageY || null,// Position Y relative to page window
+            windowX || null,
+            windowY || null,
             gazeCoords.x || null,
             gazeCoords.y || null,
             new Date().toISOString(), // Timestamp
