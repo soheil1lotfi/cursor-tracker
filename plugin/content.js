@@ -11,6 +11,24 @@ let showGazeLocation = false;
 let tagSize = 200;
 let windowWidth = window.innerWidth;
 let windowHeight = window.innerHeight;
+
+
+// On page load, check storage for gaze tracking state and toggle tags
+chrome.storage.local.get(['gazeTrackingEnabled', 'tagSize'], (result) => {
+    const enabled = result.gazeTrackingEnabled || false;
+    const size = result.tagSize || 200;
+
+    if (enabled) {
+        console.log("Gaze tracking enabled, injecting Apriltags...");
+        injectApriltag("apriltags/tag36h11-0.svg", "top-left");
+        injectApriltag("apriltags/tag36h11-1.svg", "top-right");
+        injectApriltag("apriltags/tag36h11-2.svg", "bottom-right");
+        injectApriltag("apriltags/tag36h11-3.svg", "bottom-left");
+        updateTagSize(size); // Set tag size
+        toggleApriltags(true); // Show Apriltags
+    }
+});
+
 // Function to toggle apriltags visibility
 const toggleApriltags = (enabled) => {
     const apriltags = document.querySelectorAll('.apriltag');
