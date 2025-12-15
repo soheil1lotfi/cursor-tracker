@@ -111,6 +111,7 @@ function App() {
   const providerRef = useRef(null);
   const shapesMapRef = useRef(null);
   const awarenessRef = useRef(null);
+  const shapesObserverRef = useRef(null);
 
   // Update transformer when selection changes
   useEffect(() => {
@@ -163,19 +164,23 @@ function App() {
       }
     });
 
-    // Y.js observer - the ONLY place shapes state is updated
+    // Y.js Standard: Observer with proper event handling and stored reference
     const updateShapes = () => {
       const shapesArray = [];
-      shapesMap.forEach((shape) => {
-        if (!shape.isPrivate) {
-          shapesArray.push(shape);
+      shapesMap.forEach((shape, id) => {
+        // Y.js Standard: Ensure shape is a plain object
+        const shapeObj = shape instanceof Y.Map ? shape.toJSON() : shape;
+        if (!shapeObj.isPrivate) {
+          shapesArray.push({ ...shapeObj, id });
         }
       });
       setShapes(shapesArray);
     };
 
+    // Store observer reference for cleanup
+    shapesObserverRef.current = updateShapes;
     shapesMap.observe(updateShapes);
-    updateShapes();
+    updateShapes(); // Initial load
 
     // Awareness changes
     const updateAwareness = () => {
@@ -221,7 +226,11 @@ function App() {
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      shapesMap.unobserve(updateShapes);
+      // Y.js Standard: Use stored observer reference for cleanup
+      if (shapesObserverRef.current) {
+        shapesMap.unobserve(shapesObserverRef.current);
+        shapesObserverRef.current = null;
+      }
       awareness.off('change', updateAwareness);
       provider.destroy();
       ydoc.destroy();
@@ -246,7 +255,10 @@ function App() {
       if (isPrivateMode) {
         setPrivateShapes(prev => [...prev, newShape]);
       } else {
-        shapesMapRef.current.set(newShape.id, newShape);
+        // Y.js Standard: Use Y.transact for atomic updates
+        ydocRef.current.transact(() => {
+          shapesMapRef.current.set(newShape.id, newShape);
+        });
       }
       
       setSelectedIds([]);
@@ -326,6 +338,8 @@ function App() {
   // Y.js-First: Only update Y.js, let observer handle React/Konva updates
   const handleDragMove = (e, shape) => {
     // Throttle updates
+    // Note: Date.now() is safe here - handleDragMove is an event handler, not called during render
+    // The linter incorrectly flags this, but it's a false positive
     const now = Date.now();
     if (now - lastUpdateTime.current < THROTTLE_MS) {
       return;
@@ -347,23 +361,19 @@ function App() {
 
     // Multi-select: update all selected shapes in Y.js
     if (selectedIds.includes(id) && selectedIds.length > 1) {
-      selectedIds.forEach(selectedId => {
-        const initialSelectedPos = dragInitialPositions.current[selectedId];
-        if (!initialSelectedPos) return;
+      // Y.js Standard: Batch updates in single transaction
+      ydocRef.current.transact(() => {
+        selectedIds.forEach(selectedId => {
+          const initialSelectedPos = dragInitialPositions.current[selectedId];
+          if (!initialSelectedPos) return;
 
-        const updatedX = initialSelectedPos.x + deltaX;
-        const updatedY = initialSelectedPos.y + deltaY;
+          const updatedX = initialSelectedPos.x + deltaX;
+          const updatedY = initialSelectedPos.y + deltaY;
 
-        const allShapesCurrent = [...shapes, ...privateShapes];
-        const selectedShape = allShapesCurrent.find(s => s.id === selectedId);
-        if (!selectedShape) return;
+          const allShapesCurrent = [...shapes, ...privateShapes];
+          const selectedShape = allShapesCurrent.find(s => s.id === selectedId);
+          if (!selectedShape || selectedShape.isPrivate) return;
 
-        // Update Y.js - this will trigger observer -> React state -> Konva re-render
-        if (selectedShape.isPrivate) {
-          setPrivateShapes(prev =>
-            prev.map(s => (s.id === selectedId ? { ...s, x: updatedX, y: updatedY } : s))
-          );
-        } else {
           const shapeData = shapesMapRef.current.get(selectedId);
           if (shapeData) {
             shapesMapRef.current.set(selectedId, { 
@@ -372,8 +382,29 @@ function App() {
               y: updatedY 
             });
           }
-        }
+        });
       });
+      
+      // Handle private shapes separately (outside Y.js)
+      const privateIds = selectedIds.filter(selectedId => {
+        const allShapesCurrent = [...shapes, ...privateShapes];
+        const selectedShape = allShapesCurrent.find(s => s.id === selectedId);
+        return selectedShape && selectedShape.isPrivate;
+      });
+      
+      if (privateIds.length > 0) {
+        setPrivateShapes(prev =>
+          prev.map(s => {
+            if (privateIds.includes(s.id)) {
+              const initialPos = dragInitialPositions.current[s.id];
+              if (initialPos) {
+                return { ...s, x: initialPos.x + deltaX, y: initialPos.y + deltaY };
+              }
+            }
+            return s;
+          })
+        );
+      }
     } else {
       // Single shape: update Y.js only
       if (shape.isPrivate) {
@@ -381,14 +412,17 @@ function App() {
           prev.map(s => (s.id === id ? { ...s, x: newX, y: newY } : s))
         );
       } else {
-        const shapeData = shapesMapRef.current.get(id);
-        if (shapeData) {
-          shapesMapRef.current.set(id, { 
-            ...shapeData, 
-            x: newX, 
-            y: newY 
-          });
-        }
+        // Y.js Standard: Use transaction
+        ydocRef.current.transact(() => {
+          const shapeData = shapesMapRef.current.get(id);
+          if (shapeData) {
+            shapesMapRef.current.set(id, { 
+              ...shapeData, 
+              x: newX, 
+              y: newY 
+            });
+          }
+        });
       }
     }
   };
@@ -409,7 +443,10 @@ function App() {
     if (isPrivate) {
       setPrivateShapes(prev => prev.filter(s => s.id !== id));
     } else {
-      shapesMapRef.current.delete(id);
+      // Y.js Standard: Use transaction
+      ydocRef.current.transact(() => {
+        shapesMapRef.current.delete(id);
+      });
     }
     setSelectedIds(prev => prev.filter(i => i !== id));
     setSelectedShapeId(null);
@@ -419,7 +456,10 @@ function App() {
     if (isPrivateMode) {
       setPrivateShapes([]);
     } else {
-      shapesMapRef.current.clear();
+      // Y.js Standard: Use transaction
+      ydocRef.current.transact(() => {
+        shapesMapRef.current.clear();
+      });
     }
     setSelectedIds([]);
     setSelectedShapeId(null);
@@ -431,9 +471,12 @@ function App() {
     } else {
       // Exiting private mode - share private shapes
       if (privateShapes.length > 0) {
-        privateShapes.forEach(shape => {
-          const sharedShape = { ...shape, isPrivate: false };
-          shapesMapRef.current.set(shape.id, sharedShape);
+        // Y.js Standard: Batch updates in transaction
+        ydocRef.current.transact(() => {
+          privateShapes.forEach(shape => {
+            const sharedShape = { ...shape, isPrivate: false };
+            shapesMapRef.current.set(shape.id, sharedShape);
+          });
         });
         setPrivateShapes([]);
       }
@@ -464,21 +507,35 @@ function App() {
     // Change color of all selected shapes
     if (selectedIds.length > 0) {
       const allShapesCurrent = [...shapes, ...privateShapes];
-      selectedIds.forEach(id => {
+      
+      // Y.js Standard: Batch color updates in transaction
+      const publicIds = selectedIds.filter(id => {
         const shape = allShapesCurrent.find(s => s.id === id);
-        if (shape) {
-          if (shape.isPrivate) {
-            setPrivateShapes(prev =>
-              prev.map(s => (s.id === id ? { ...s, fill: newColor } : s))
-            );
-          } else {
+        return shape && !shape.isPrivate;
+      });
+      
+      if (publicIds.length > 0) {
+        ydocRef.current.transact(() => {
+          publicIds.forEach(id => {
             const shapeData = shapesMapRef.current.get(id);
             if (shapeData) {
               shapesMapRef.current.set(id, { ...shapeData, fill: newColor });
             }
-          }
-        }
+          });
+        });
+      }
+      
+      // Handle private shapes separately
+      const privateIds = selectedIds.filter(id => {
+        const shape = allShapesCurrent.find(s => s.id === id);
+        return shape && shape.isPrivate;
       });
+      
+      if (privateIds.length > 0) {
+        setPrivateShapes(prev =>
+          prev.map(s => (privateIds.includes(s.id) ? { ...s, fill: newColor } : s))
+        );
+      }
     }
   };
 
@@ -804,3 +861,145 @@ function App() {
 }
 
 export default App;
+
+
+=========================================================================================
+
+
+const express = require("express");
+const cors = require("cors");
+const http = require("http");
+const { WebSocketServer } = require("ws");
+const mongoose = require("mongoose");
+const Y = require("yjs");
+const { setupWSConnection } = require('y-websocket/bin/utils');
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+const dbURI =
+  "mongodb+srv://soheil1lotfi:soloLotfi@cscw.93kngev.mongodb.net/?appName=CSCW";
+const server = http.createServer(app);
+
+// Connect to MongoDB
+mongoose
+  .connect(dbURI)
+  .then(() => {
+    server.listen(3001, () => {
+      console.log("Server running on http://localhost:3001");
+    });
+  })
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+  });
+
+// Y.js WebSocket Server
+const wss = new WebSocketServer({ server });
+
+// Store Y.js documents
+const docs = new Map(); // docName -> Y.Doc
+
+// Get or create Y.js document
+function getYDoc(docName) {
+  if (!docs.has(docName)) {
+    const doc = new Y.Doc();
+    docs.set(docName, doc);
+
+    // Load from MongoDB on first access
+    loadDocumentFromDB(docName, doc);
+
+    // Setup persistence
+    setupPersistence(docName, doc);
+  }
+  return docs.get(docName);
+}
+
+// Load Y.js document from MongoDB
+async function loadDocumentFromDB(docName, ydoc) {
+  try {
+    const Shape = require("./models/shapes");
+    const dbShapes = await Shape.find();
+
+    if (dbShapes.length > 0) {
+      // Y.js Standard: Load within transaction
+      ydoc.transact(() => {
+        const shapesMap = ydoc.getMap("shapes");
+        dbShapes.forEach((shape) => {
+          shapesMap.set(shape.id, {
+            id: shape.id,
+            x: shape.x,
+            y: shape.y,
+            type: shape.type,
+            fill: shape.fill,
+            isPrivate: shape.isPrivate || false,
+            isLocked: shape.isLocked || false,
+          });
+        });
+      });
+      console.log(`Loaded ${dbShapes.length} shapes from MongoDB`);
+    }
+  } catch (error) {
+    console.error("Error loading from MongoDB:", error);
+  }
+}
+
+// Persist Y.js document to MongoDB periodically
+function setupPersistence(docName, ydoc) {
+  const Shape = require("./models/shapes");
+  const shapesMap = ydoc.getMap("shapes");
+
+  let isDirty = false;
+
+  shapesMap.observe(() => {
+    isDirty = true;
+  });
+
+  setInterval(async () => {
+    if (!isDirty) return;
+    isDirty = false;
+
+    try {
+      await Shape.deleteMany({});
+
+      const shapes = [];
+      // Y.js Standard: Read within transaction context
+      ydoc.transact(() => {
+        shapesMap.forEach((shape) => {
+          if (!shape.isPrivate) {
+            shapes.push({
+              id: shape.id,
+              x: shape.x,
+              y: shape.y,
+              type: shape.type,
+              fill: shape.fill,
+              isPrivate: shape.isPrivate || false,
+              isLocked: shape.isLocked || false,
+            });
+          }
+        });
+      });
+
+      if (shapes.length > 0) {
+        await Shape.insertMany(shapes);
+        console.log(`Persisted ${shapes.length} shapes to MongoDB`);
+      }
+    } catch (error) {
+      console.error("Error persisting to MongoDB:", error);
+    }
+  }, 5000);
+}
+
+// Y.js Standard: Use y-websocket's setupWSConnection
+wss.on("connection", (ws, req) => {
+  console.log("New Y.js client connected");
+
+  const docName = req.url.slice(1).split('?')[0] || 'collaborative-whiteboard';
+  const doc = getYDoc(docName);
+
+  // This handles all protocol correctly!
+  setupWSConnection(ws, req, doc);
+});
+
+console.log("Y.js WebSocket server initialized");
