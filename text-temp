@@ -153,7 +153,6 @@ function App() {
     awareness.setLocalState({
       user: userRef.current,
       cursor: { x: 0, y: 0 },
-      dragging: null,
       isPrivateMode: false,
     });
 
@@ -288,27 +287,6 @@ function App() {
     const shapesToDrag = selectedIds.includes(id) && selectedIds.length > 1 
       ? selectedIds 
       : [id];
-    
-    // Check if any shapes are being dragged by others
-    const states = awarenessRef.current.getStates();
-    let isDraggingByOther = false;
-    states.forEach((state) => {
-      if (state.user && state.user.id !== userRef.current.id) {
-        const otherDraggingIds = Array.isArray(state.dragging) 
-          ? state.dragging 
-          : (state.dragging ? [state.dragging] : []);
-        
-        const hasOverlap = shapesToDrag.some(shapeId => otherDraggingIds.includes(shapeId));
-        if (hasOverlap) {
-          isDraggingByOther = true;
-        }
-      }
-    });
-
-    if (isDraggingByOther) {
-      e.currentTarget.stopDrag();
-      return;
-    }
 
     // Store initial positions for all shapes that will be dragged
     dragInitialPositions.current = {};
@@ -321,13 +299,6 @@ function App() {
           y: selectedShape.y 
         };
       }
-    });
-
-    // Set dragging in awareness
-    const localState = awarenessRef.current.getLocalState();
-    awarenessRef.current.setLocalState({
-      ...localState,
-      dragging: shapesToDrag.length > 1 ? shapesToDrag : shapesToDrag[0],
     });
 
     if (!selectedIds.includes(id)) {
@@ -430,13 +401,6 @@ function App() {
   const handleDragEnd = () => {
     // Clear stored positions
     dragInitialPositions.current = {};
-    
-    // Release drag lock
-    const localState = awarenessRef.current.getLocalState();
-    awarenessRef.current.setLocalState({
-      ...localState,
-      dragging: null,
-    });
   };
 
   const handleDelete = (id, isPrivate) => {
@@ -560,24 +524,6 @@ function App() {
 
   const renderShape = (shape) => {
     const isSelected = selectedIds.includes(shape.id);
-    
-    // Check if being dragged by another user
-    let isDraggingByOther = false;
-    let draggingUserColor = null;
-    const states = awarenessRef.current?.getStates();
-    if (states) {
-      states.forEach((state) => {
-        if (state.user && state.user.id !== userRef.current.id) {
-          const otherDraggingIds = Array.isArray(state.dragging) 
-            ? state.dragging 
-            : (state.dragging ? [state.dragging] : []);
-          if (otherDraggingIds.includes(shape.id)) {
-            isDraggingByOther = true;
-            draggingUserColor = state.user.color;
-          }
-        }
-      });
-    }
 
     const shapeProps = {
       key: shape.id,
@@ -585,10 +531,10 @@ function App() {
       x: shape.x,
       y: shape.y,
       fill: shape.fill,
-      stroke: isDraggingByOther ? draggingUserColor : (isSelected ? '#0096FF' : '#000'),
-      strokeWidth: isDraggingByOther ? 3 : (isSelected ? 2 : 1),
+      stroke: isSelected ? '#0096FF' : '#000',
+      strokeWidth: isSelected ? 2 : 1,
       dash: shape.isPrivate ? [8, 4] : undefined,
-      draggable: !isDraggingByOther,
+      draggable: true,
       onClick: (e) => handleShapeClick(e, shape),
       onTap: (e) => handleShapeClick(e, shape),
       onDragStart: (e) => handleDragStart(e, shape),
@@ -861,8 +807,6 @@ function App() {
 }
 
 export default App;
-
-
 =========================================================================================
 
 
